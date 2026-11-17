@@ -126,6 +126,9 @@ void ctrlc_handler(int);
 // File Handler
 #include "io/file_handler.h"
 
+// Checkpoint / restart (bit-identical resume after interruption)
+#include "io/checkpoint.h"
+
 /*****************************************************************************/
 /////////
 // MAIN /
@@ -141,6 +144,7 @@ int main(int argc, char*argv[])
   int trem;                             // Used to calculate run time
   int i, ip, j, m;			// Iteration
   int size, allocate=0;			// allocated data size
+  int ckpt_interval = 0;       // Checkpoint every N steps (0 = off, argv[16])
   
   //Defaults
   FAIL_SAFE=10;        			// Fail Safe (Program will stop at iteration ###)
@@ -197,6 +201,14 @@ int main(int argc, char*argv[])
 	ANGLE_A_CYC = atof(argv[7]);
       if (argc >8)
 	T = atof(argv[8]);
+      // Checkpoint interval in steps (0 = off). State -> <fileout>.ckpt;
+      // an existing checkpoint resumes the run instead of restarting it.
+      // argv[9..15] are the sheath line's options; main keeps argv[16]
+      // so the checkpoint CLI matches across lines.
+      if (argc > 16)
+	ckpt_interval = atoi(argv[16]);
+      if (ckpt_interval < 0)
+	ckpt_interval = 0;
     }
   else      	
     {
@@ -210,8 +222,9 @@ int main(int argc, char*argv[])
   printf("OPENING DATA FILES \n"
   );
   file_str = openfile2(filein,".str");
-  file_vc = openfile(fileout,".vc");		// Voltage / Current @ feed
-  file_fd = openfile(fileout,".fd");		// Field Values
+  // file_vc/file_fd are opened after setup, once we know whether a
+  // checkpoint resumes this run (append) or starts it fresh
+  // (truncate + header).
 
   // Set up Arrays
   printf("INSALIZING ARRAYS \n");
@@ -271,9 +284,71 @@ int main(int argc, char*argv[])
       printf("\t N_0 -> %5.3f, %5.3f, %5.3f 1/cc\n",N_0[0]*1e-6,N_0[1]*1e-6,N_0[2]*1e-6);
     }
 
-  // Write header line for output files
-  headvc(file_vc);
-  headfd(file_fd);
+
+  // Checkpoint resume check. The normal init path above rebuilt all static
+  // state deterministically; if a checkpoint exists, overwrite the dynamic
+  // arrays with it and continue the exact trajectory instead of restarting.
+  char ckptpath[600];
+  snprintf(ckptpath, sizeof(ckptpath), "%s.ckpt", fileout);
+  int resumed = 0;
+  BCArray bcs[12] = {
+    {EYLEFT, 1, 3, 1, sy, 1, sz, 0, 2}, {EZLEFT, 1, 3, 1, sy, 1, sz, 0, 2},
+    {EYRIGHT, 1, 3, 1, sy, 1, sz, 0, 2}, {EZRIGHT, 1, 3, 1, sy, 1, sz, 0, 2},
+    {EXFRONT, 1, sx, 1, 3, 1, sz, 0, 2}, {EZFRONT, 1, sx, 1, 3, 1, sz, 0, 2},
+    {EXBACK, 1, sx, 1, 3, 1, sz, 0, 2}, {EZBACK, 1, sx, 1, 3, 1, sz, 0, 2},
+    {EXBOTTOM, 1, sx, 1, sy, 1, 3, 0, 2}, {EYBOTTOM, 1, sx, 1, sy, 1, 3, 0, 2},
+    {EXTOP, 1, sx, 1, sy, 1, 3, 0, 2}, {EYTOP, 1, sx, 1, sy, 1, 3, 0, 2},
+  };
+  if (ckpt_interval > 0 && ckpt_exists(ckptpath))
+    {
+      int ri;
+      double rt;
+      CkptLevels lv;
+      if (ckpt_read(ckptpath, &ri, &rt, &ip, &lv, bcs, 12) == 0)
+        {
+          i = ri;
+          timev = rt;
+          // Restore the time-level rotation state (main's field/plasma
+          // updates toggle these once per iteration; restarting them at
+          // their init values replays the wrong level after resume).
+          tlE_old = lv.tlE_old; tlE_cur = lv.tlE_cur;
+          tlB_old = lv.tlB_old; tlB_cur = lv.tlB_cur;
+          tlU_0 = lv.tlU_0; tlU_1 = lv.tlU_1; tlU_2 = lv.tlU_2;
+          tlN_0 = lv.tlN_0; tlN_1 = lv.tlN_1; tlN_2 = lv.tlN_2;
+          resumed = 1;
+          // Drop record samples written after the checkpoint iteration so
+          // the resumed run does not duplicate them on append.
+          if (ckpt_truncate_record(fileout, ".vc", i, 1) != 0)
+            printf("WARNING: could not truncate .vc to checkpoint iteration\n");
+          if (fields == 1 &&
+              ckpt_truncate_record(fileout, ".fd", i, frate) != 0)
+            printf("WARNING: could not truncate .fd to checkpoint iteration\n");
+          printf("Resumed from checkpoint %s at iteration %d (t=%e s)\n",
+                 ckptpath, i, timev);
+        }
+      else
+        printf("WARNING: checkpoint %s unreadable; starting fresh\n", ckptpath);
+    }
+
+  // Voltage / Current @ feed: append on resume, truncate + header on fresh.
+  if (resumed)
+    file_vc = openfile_append(fileout, ".vc");
+  else
+    {
+      file_vc = openfile(fileout, ".vc");
+      headvc(file_vc);
+    }
+
+  if (fields == 1)
+    {
+      if (resumed)
+        file_fd = openfile_append(fileout, ".fd");
+      else
+        {
+          file_fd = openfile(fileout, ".fd");	// Field Values
+          headfd(file_fd);
+        }
+    }
 
   // Prepare for loops by taking over the Control-C interrupt
   if (signal(SIGINT, ctrlc_handler) == SIG_ERR)
@@ -286,9 +361,12 @@ int main(int argc, char*argv[])
   // Finite Time part of FDTD
   printf("\n");
   printf("--------------------------------------------------------------------------------\n");
-  timev = 0.0;
-  i = 1;
-  ip = 1000000000;
+  if (!resumed)
+    {
+      timev = 0.0;
+      i = 1;
+      ip = 1000000000;
+    }
 
   // Note: C_flag < # is set so that false convergance are overlooked
   while ( Q_flag == 0 )
@@ -356,12 +434,43 @@ int main(int argc, char*argv[])
       i += 1;
       ip += 1;
 
+
+      // Terminate when the maximum iteration count is reached
+      if (i > FAIL_SAFE)
+        Q_flag = 1;
+
+      // Checkpoint the full dynamic state (atomic tmp+rename). Captured
+      // after the increments, so (i, timev) is the start of the next
+      // iteration and a resume continues without duplicating output.
+      // fflush first: a SIGKILL loses stdio buffers, so without this the
+      // record on disk could lag the checkpoint and resume would skip
+      // samples.
+      if (ckpt_interval > 0 && Q_flag == 0 && (i % ckpt_interval) == 0)
+        {
+          fflush(file_vc);
+          if (fields == 1 && file_fd != NULL)
+            fflush(file_fd);
+          CkptLevels lv = {tlE_old, tlE_cur, tlB_old, tlB_cur,
+                           tlU_0, tlU_1, tlU_2, tlN_0, tlN_1, tlN_2};
+          if (ckpt_write(ckptpath, i, timev, ip, &lv, bcs, 12) != 0)
+            printf("WARNING: checkpoint write failed at iteration %d\n", i);
+        }
+
       // Use to exit for testing
       //       Q_flag = 1;
 
     }	
   printf("\n--------------------------------------------------------------------------------\n");
   printf("\n");
+
+  // On clean completion the checkpoint is stale; remove it so a later
+  // invocation with the same output path starts fresh. An early exit
+  // (Ctrl-C, kill, crash) keeps the checkpoint for resume.
+  if (ckpt_interval > 0 && i > FAIL_SAFE)
+    {
+      remove(ckptpath);
+      printf("Run completed; checkpoint removed\n");
+    }
 
   // close DATA FILE
   printf("Closing Data Files \n");
