@@ -42,6 +42,42 @@ bool rdi(FILE* f, int* v) { return rd(f, v, sizeof(*v)); }
 bool wrd(FILE* f, double v) { return wr(f, &v, sizeof(v)); }
 bool rdd(FILE* f, double* v) { return rd(f, v, sizeof(*v)); }
 
+// Portable getline: POSIX getline() is not available on MinGW, so read
+// a full line with fgetc into a growing buffer. Same contract as
+// getline(): returns the line length including the newline, or -1 at EOF
+// (no characters read) or on allocation failure; *linep is malloc'd by
+// this helper and freed by the caller. Returns long (not ssize_t) so no
+// extra headers are needed on any platform.
+long ckpt_getline(char** linep, size_t* capp, FILE* f) {
+  size_t n = 0, cap = *capp;
+  char* buf = *linep;
+  if (!buf) {
+    cap = 128;
+    buf = (char*)malloc(cap);
+    if (!buf) return -1;
+  }
+  int c;
+  while ((c = fgetc(f)) != EOF) {
+    if (n + 2 > cap) {
+      cap *= 2;
+      char* nb = (char*)realloc(buf, cap);
+      if (!nb) return -1;  // buf still valid; caller frees it
+      buf = nb;
+    }
+    buf[n++] = (char)c;
+    if (c == '\n') break;
+  }
+  if (n == 0) {
+    *linep = buf;
+    *capp = cap;
+    return -1;
+  }
+  buf[n] = '\0';
+  *linep = buf;
+  *capp = cap;
+  return (long)n;
+}
+
 bool wr_bc(FILE* f, const BCArray& b) {
   long n = (long)(b.x2 - b.x1 + 1) * (b.y2 - b.y1 + 1) * (b.z2 - b.z1 + 1) *
            (b.m2 - b.m1 + 1);
@@ -158,10 +194,10 @@ int ckpt_truncate_record(const char* fileout, const char* suffix, int iter,
   }
   char* line = nullptr;
   size_t cap = 0;
-  ssize_t len;
+  long len;
   long n = 0;  // lines written; line 0 is the header
   bool ok = true;
-  while ((len = getline(&line, &cap, f)) != -1) {
+  while ((len = ckpt_getline(&line, &cap, f)) != -1) {
     if (n == 0 || n <= nkeep) {
       if (fwrite(line, 1, (size_t)len, o) != (size_t)len) {
         ok = false;
