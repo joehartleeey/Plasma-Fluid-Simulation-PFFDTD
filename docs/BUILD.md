@@ -213,9 +213,17 @@ files:
   `make profile` — all exit 0, all produce working ELF executables.
 - CMake: `pffdtd_debug`, `pffdtd_release`, `pffdtd_profile`,
   `pffdtd_parallel` — all build; the unit tests build and pass (1/1).
-- `.bat` files: the `g++` commands they contain were run verbatim on
-  Linux and link successfully. The batch wrappers themselves
-  (MinGW `PATH` handling) were not executed on Windows.
+- `.bat` files / Windows executables: the shipped `.exe` files
+  (`pffdtd_serial.exe`, `pffdtd_parallel.exe`, `pffdtd_debug.exe`)
+  were cross-compiled on Linux with MinGW-w64 13.2 from the current
+  source, using the same commands as the `.bat` files plus `-static`,
+  so they need no MinGW DLLs — just run them. They are generic
+  x86-64 (no `-march=native`). The batch wrappers themselves
+  (MinGW `PATH` handling) were not executed on Windows. Note: the
+  checkpoint code originally used POSIX `getline()`, which MinGW
+  lacks; it now uses a portable line reader in
+  `src/io/checkpoint.cpp`, which is what makes the cross-build
+  possible.
 
 ## Running a first case
 
