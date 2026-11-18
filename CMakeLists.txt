@@ -32,6 +32,7 @@ set(SOURCES
     src/source/source.cpp
     src/fields/field_calculator.cpp
     src/io/file_handler.cpp
+    src/io/checkpoint.cpp
     src/io/output.cpp
     src/physics/plasma.cpp
     src/utils/memallocate.cpp

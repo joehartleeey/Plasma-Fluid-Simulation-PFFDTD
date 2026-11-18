@@ -14,7 +14,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 REM Compile
 echo Running g++...
-g++ -std=c++11 -O3 -fopenmp src/pffdtd.cpp src/utils/memallocate.cpp src/io/file_handler.cpp src/io/output.cpp src/source/source.cpp src/fields/field_calculator.cpp src/physics/plasma.cpp -o pffdtd_parallel.exe
+g++ -std=c++11 -O3 -fopenmp src/pffdtd.cpp src/utils/memallocate.cpp src/io/file_handler.cpp src/io/checkpoint.cpp src/io/output.cpp src/source/source.cpp src/fields/field_calculator.cpp src/physics/plasma.cpp -o pffdtd_parallel.exe
 
 if %ERRORLEVEL% EQU 0 (
     echo Compilation Successful!
