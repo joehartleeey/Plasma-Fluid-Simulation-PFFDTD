@@ -11,8 +11,9 @@ Start here to understand and use the code:
 ### 👨‍💻 For Developers
 Learn how to develop and contribute:
 1. [docs/DEVELOPERS.md](docs/DEVELOPERS.md) - Development setup and guidelines
-2. [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) - How to contribute
-3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Code structure
+2. [docs/BUILD.md](docs/BUILD.md) - How to build (Makefile, CMake, .bat)
+3. [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) - How to contribute
+4. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Code structure
 
 ### 🔬 For Physics Understanding
 Deep dive into the physics:
@@ -126,7 +127,7 @@ PROJECT ROOT
 ## Key Information Locations
 
 ### Installation & Building
-- **How to compile**: [README.md - Build Instructions](README.md#build-instructions)
+- **How to compile**: [docs/BUILD.md](docs/BUILD.md) - Build guide (Makefile, CMake, .bat)
 - **Makefile usage**: [Makefile](Makefile)
 - **Development setup**: [DEVELOPERS.md - Development Setup](docs/DEVELOPERS.md#development-setup)
 
