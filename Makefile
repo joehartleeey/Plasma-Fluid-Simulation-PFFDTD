@@ -10,11 +10,11 @@
 CXX = g++
 CXXFLAGS_BASE = -std=c++11 -Wall -Wextra
 CXXFLAGS_DEBUG = $(CXXFLAGS_BASE) -O0 -g -DDEBUG
-CXXFLAGS_RELEASE = $(CXXFLAGS_BASE) -O3 -march=native -DNDEBUG
+CXXFLAGS_RELEASE = $(CXXFLAGS_BASE) -O2 -march=native -DNDEBUG
 
 # Directories
 SRC_DIR = src
-BIN_DIR = .
+BIN_DIR = build
 TEST_DIR = tests
 
 # Source files
@@ -31,9 +31,9 @@ HEADERS = $(SRC_DIR)/physics/plasma.h $(SRC_DIR)/io/output.h $(SRC_DIR)/source/s
           $(SRC_DIR)/utils/memallocate.h
 
 # Output
-TARGET_SERIAL = $(BIN_DIR)/pffdtd_serial
-TARGET_PARALLEL = $(BIN_DIR)/pffdtd_parallel
-TARGET_DEBUG = $(BIN_DIR)/pffdtd_debug
+TARGET_SERIAL = $(BIN_DIR)/pffdtd_serial_${BB_CPU}
+TARGET_PARALLEL = $(BIN_DIR)/pffdtd_parallel_${BB_CPU}
+TARGET_DEBUG = $(BIN_DIR)/pffdtd_debug_${BB_CPU}
 
 # Default target
 .PHONY: all
