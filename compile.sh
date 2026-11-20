@@ -3,6 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --qos=bbdefault
+#SBATCH --output=logs/compile/%A-%a.out
 
 module purge; module load bluebear
 
