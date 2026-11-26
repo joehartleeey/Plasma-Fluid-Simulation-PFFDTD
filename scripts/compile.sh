@@ -2,7 +2,8 @@
 #SBATCH --time=5:0
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --qos=bbdefault
+#SBATCH --qos=bbshort
+#SBATCH --account=reidb-meng-jhartley
 #SBATCH --output=logs/compile/%A-%a.out
 
 module purge; module load bluebear
