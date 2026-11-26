@@ -1,22 +1,23 @@
 #!/bin/bash
 #SBATCH --job-name=pffdtd_sim
 #SBATCH --account=reidb-meng-jhartley
-#SBATCH --output=logs/%j/pffdtd.log
-#SBATCH --error=logs/%j/pffdtd.log
+#SBATCH --output=logs/pffdtd-%j.log
+#SBATCH --error=logs/pffdtd-%j.log
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH --mem=16276M
 #SBATCH --cpus-per-task=1
 #SBATCH --qos=bbdefault
 
 set -e
 
-RUN_NAME="first_run"
+RUN_NAME="${SLURM_JOB_NAME}_$(date +%Y%m%dT%H%M%S)"
 
-F_PLASMA=""
-F_COLLISION=""
-F_CYCLOTRON=""
-ANG_E="90.0"
+F_PLASMA="5.3e6"
+F_COLLISION="0.27"
+F_CYCLOTRON="18.7"
+ANG_E="22.0"
 ANG_A="0.0"
 T=""
 
@@ -26,37 +27,24 @@ EXE="build/pffdtd_serial_${BB_CPU}"
 
 # Check executable exists
 if [ ! -f "$EXE" ]; then
-    echo "Error: No executable found."
+    echo "[$(date -Iseconds)] Error: No executable found."
     exit 1
 fi
 
 if [ ! -f "$STR_FILE.str" ]; then
-    echo "Error: Could not find .str file."
+    echo "[$(date -Iseconds)] Error: Could not find .str file."
     exit 1
 fi
 
 OUT_DIR="results/${RUN_NAME}"
 mkdir -p "$OUT_DIR"
 
-echo "=========================================="
-echo "Starting Simulation: ${RUN_NAME}"
-echo "Output Directory: ${OUT_DIR}"
-echo "=========================================="
+echo "[$(date -Iseconds)] Starting Simulation: ${RUN_NAME} with output directory: ${OUT_DIR}"
+echo "[$(date -Iseconds)] Using Executable: ${EXE}"
 
-echo "Using Executable: ${EXE}"
+echo "[$(date -Iseconds)] Start Time"
+./${EXE} "${STR_FILE}" "${OUT_DIR}/data" "$F_PLASMA" "$F_COLLISION" "$F_CYCLOTRON" "$ANG_E" "$ANG_A" "$T"
+echo "[$(date -Iseconds)] End Time"
 
-echo "Start Time: $(date '+%H:%M:%S')" > "${OUT_DIR}/simulation.log"
-
-"$EXE" "${STR_FILE}" "${OUT_DIR}/data" \
-    "$F_PLASMA" "$F_COLLISION" "$F_CYCLOTRON" \
-    "$ANG_E" "$ANG_A" "$T" \
-    >> "${OUT_DIR}/simulation.log" 2>&1
-
-echo "End Time: $(date '+%H:%M:%S')" >> "${OUT_DIR}/simulation.log"
-
-echo "Simulation Complete."
-echo "Plotting Results..."
-
-python visualization/plot_voltage.py "${OUT_DIR}/data.vc" --save "${OUT_DIR}/impedance_plot.png"
-
-echo "Done. Results in ${OUT_DIR}"
+echo "[$(date -Iseconds)] Simulation Complete."
+echo "[$(date -Iseconds)] Results in ${OUT_DIR}"
