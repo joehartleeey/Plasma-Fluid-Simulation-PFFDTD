@@ -37,3 +37,5 @@ Desktop.ini
 # Temporary
 temp/
 tmp/
+
+logs/
