@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=pffdtd_sim
 #SBATCH --account=reidb-meng-jhartley
-#SBATCH --output=logs/pffdtd_%j.log
-#SBATCH --error=logs/pffdtd_%j.log
+#SBATCH --output=logs/%j/pffdtd.log
+#SBATCH --error=logs/%j/pffdtd.log
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
