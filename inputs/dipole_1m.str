@@ -1,7 +1,7 @@
 //PF-FDTD input: dipole antenna
 //Grid Parameters
 200  200  200
-1.000000e-03  1.000000e-03  1.000000e-03
+0.001 0.001 0.001
 //Fail Safe Parameters
 4000000
 30
