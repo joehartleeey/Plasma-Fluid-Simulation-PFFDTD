@@ -1,10 +1,16 @@
-
-
 import argparse
 import math
 import sys
 
-METAL = (1, 1, 1)     # Perfect Electrical Conductor
+# Cell material codes (see docs/INPUT_FORMAT.md / src/io/file_handler.cpp):
+#   1 = PEC along that axis (1/Er -> 0, kills that E-component)
+#   2 = dielectric material 1 (1/Er -> 1/Er1)
+#   3 = dielectric material 2 (1/Er -> 1/Er2)
+#   0 = free space / plasma (1/Er -> 1)
+# A thin wire only carries current along its own axis, so the PEC code is
+# set only in that direction and the transverse components stay free space
+# (z-dipole cell -> "0 0 1", x-dipole -> "1 0 0", y-dipole -> "0 1 0").
+METAL = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}
 
 
 class Config:
@@ -92,11 +98,11 @@ class Config:
         return errors
 
 def put_line(cfg, points, mat, thickness=0):
-    
+
     (x0, y0, z0), (x1, y1, z1) = points
-    
+
     n = max(abs(x1 - x0), abs(y1 - y0), abs(z1 - z0))
-    
+
     for i in range(n + 1):
         t = 0 if n == 0 else i / n
         x = round(x0 + (x1 - x0) * t)
@@ -119,14 +125,17 @@ def dedupe(cfg):
         seen.setdefault(cell[:3], cell)
     cfg.cells = list(seen.values())
 
-def build_dipole(cfg, length, axis, center, mat=METAL, thickness=0):
-    
+def build_dipole(cfg, length, axis, center, mat=None, thickness=0):
+
     c = {"x": 0, "y": 1, "z": 2}[axis]
-    
+
+    if mat is None:
+        mat = METAL[axis]
+
     half = length // 2
 
-    lo = [center[0] + (0 if i != c else -half - 1) for i in range(3)]
-    hi = [center[0] + (0 if i != c else half) for i in range(3)]
+    lo = [center[i] + (0 if i != c else -half - 1) for i in range(3)]
+    hi = [center[i] + (0 if i != c else half) for i in range(3)]
 
     put_line(cfg, ((lo[0], lo[1], lo[2]), (hi[0], hi[1], hi[2])), mat, thickness)
 
@@ -179,7 +188,7 @@ def main():
     # --- build antenna ---
     if args.antenna == "dipole":
         feed = build_dipole(cfg, args.length, args.axis, center, thickness=args.thickness)
-    
+
     # --- source at feed ---
     if args.src_pos:
         sx, sy, sz = [int(v) for v in args.src_pos.split(",")]
