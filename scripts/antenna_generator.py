@@ -30,6 +30,8 @@ class Config:
             "lower": (1,1,1),
             "upper": (sx - 1, sy - 1, sz - 1),
         }
+        self.max_iter = 640000       # FAIL_SAFE: max FDTD iterations
+        self.plasma_cycles = 1000000000  # PLASMA_CYCLE: max plasma oscillations
 
     def to_str(self, header=""):
         """
@@ -39,6 +41,9 @@ class Config:
         lines.append("//Grid Parameters")
         lines.append(f"{self.sx}  {self.sy}  {self.sz}")
         lines.append(f"{self.dx:.6e}  {self.dy:.6e}  {self.dz:.6e}")
+        lines.append("//Fail Safe Parameters")
+        lines.append(f"{self.max_iter}")
+        lines.append(f"{self.plasma_cycles}")
         lines.append("//Source Parameters")
         lines.append(str(len(self.sources)))
         for x, y, z, field, stype, param in self.sources:
@@ -66,6 +71,10 @@ class Config:
         for name, d in (("dx", self.dx), ("dy", self.dy), ("dz", self.dz)):
             if d <= 0:
                 errors.append(f"Grid spacing {name}={d} must be > 0")
+        if self.max_iter < 1:
+            errors.append(f"FAIL_SAFE (max iterations) = {self.max_iter} must be >= 1")
+        if self.plasma_cycles < 1:
+            errors.append(f"PLASMA_CYCLE = {self.plasma_cycles} must be >= 1")
         if not (1 <= len(self.sources) <= 100):
             errors.append(f"Number of sources ({len(self.sources)}) outside 1-100")
         bounds = (self.sx, self.sy, self.sz)
@@ -161,6 +170,8 @@ def main():
     ap.add_argument("--src-param", type=float, default=1.0e7)
     ap.add_argument("--er1", type=float, default=1.0)
     ap.add_argument("--er2", type=float, default=1.0)
+    ap.add_argument("--max-iter", type=int, default=640000, help="FAIL_SAFE: max FDTD iterations (run length cap)")
+    ap.add_argument("--plasma-cycles", type=int, default=30, help="PLASMA_CYCLE: max plasma oscillations (second run-length cap; effectively disabled in free space)")
     ap.add_argument("--output-region", default=None, help="7 values: iter E B Ue Ne Ui Ni lower(3) upper(3); or use --iter and --region")
     ap.add_argument("--iter", type=int, default=10, help="iterations between outputs")
     ap.add_argument("--flags", default="1 1 0 0 0 0", help="E B Ue Ne Ui Ni flags")
@@ -178,6 +189,7 @@ def main():
 
     cfg = Config(args.nx, args.ny, args.nz, args.dx, args.dy, args.dz)
     cfg.er1, cfg.er2 = args.er1, args.er2
+    cfg.max_iter, cfg.plasma_cycles = args.max_iter, args.plasma_cycles
 
     center = [
         args.cx if args.cx is not None else args.nx // 2,
